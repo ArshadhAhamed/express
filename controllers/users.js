@@ -1,140 +1,151 @@
-const data = [
-  {
-      "firstName":"Nag",
-      "lastName":"Raj",
-      "email":"nag@gmail.com",
-      "batch":"B20WEE",
-      "status":false
-  },
-  {
-      "firstName":"Raj",
-      "lastName":"Raj",
-      "email":"Raj@gmail.com",
-      "batch":"B46WET",
-      "status":true
-  },
-  {
-      "firstName":"Kritish",
-      "lastName":"Datt",
-      "email":"kritish@gmail.com",
-      "batch":"B46WET",
-      "status":true   
-  }
-]
+const {mongodb,client} = require('../configdb/dbConfig')
+const sanitize=require('../common/sanitize')
+
+
 const getUsers = async(req,res)=>{
-  try {
-      res.status(200).send({
-          data,
-          message:"User Data Fetch Successfull"
-      })
-  } catch (error) { 
-  }
+    await client.connect();
+    try {
+        let db = await client.db(process.env.dbName)
+        let data = await db.collection('users').find().toArray();
+        res.status(200).send({
+            data,
+            message:"User Data Fetch Successfull"
+        })
+    } catch (error) { 
+        res.status(500).send({
+            message:"Internal Server Error",
+            errorMessage: error.message
+        })
+    }
+    finally{
+        await client.close()
+    }
 }
 const getUserById =  async(req,res)=>{
+  await client.connect()
   try {
-      let userId = Number(req.params.id)
-      if(userId<data.length)
+      let db = await client.db(process.env.dbName)
+      let userId = new mongodb.ObjectId(sanitize.isString(req.params.id))
+      let data = await db.collection('users').findOne({_id: userId})
+      if(data)
       {
           res.status(200).send({
-              data:data[userId],
+              data,
               message:"User Data Fetch Successfull"
           })
       }
       else
-      {
-          res.status(400).send({
-              message:"Invalid User ID"
-          })
-      }
-      
+          res.status(400).send({message:"Invalid User ID"})
   } catch (error) { 
       res.status(500).send({
           message:"Internal Server Error",
           errorMessage: error.message
       })
   }
+  finally{
+      await client.close()
+  }
 }
 
-const createUser = async(req,res)=>{
-  try {
-      let validateData = dat.filter((e)=>e.email===req.body.email)
-      if(validateData.length===0)
-      {
-          data.push(req.body)
-          res.status(201).send({
-              message:"User Data Created Successfully"
-          })
-      }
-      else
-      {
-          res.status(400).send({
-              message:`${req.body.email} already exists`
-          })
-      }
 
-     
-  } catch (error) { 
-      res.status(500).send({
-          message:"Internal Server Error",
-          errorMessage: error.message
-      })
-  }   
+const createUser = async(req,res)=>{
+    await client.connect();
+    try {
+        const firstName = sanitize.isString(req.body.firstName)
+        const lastName = sanitize.isString(req.body.lastName)
+        const email = sanitize.isString(req.body.email)
+        const batch = sanitize.isString(req.body.batch)
+        const status = sanitize.isBoolean(req.body.status)
+        const db = client.db(process.env.dbName);
+       let existingUser = await db.collection('users').findOne({email:email})
+       if(!existingUser)
+       {
+            await db.collection('users').insertOne({firstName,lastName,email,batch,status})
+
+            res.status(200).send({
+                message:"User Created Successfully"
+            })
+       }
+       else
+       {
+        res.status(400).send({
+            message:`${email} already exists`
+        })
+       }
+    } catch (error) { 
+        res.status(500).send({
+            message:"Internal Server Error",
+            errorMessage: error.message
+        })
+    }
+    finally{
+        await client.close()
+    }
 }
 
 const editUserById = async(req,res)=>{
+    await client.connect();
+    try {
+         const firstName = sanitize.isString(req.body.firstName)
+        const lastName = sanitize.isString(req.body.lastName)
+        const email = sanitize.isString(req.body.email)
+        const batch = sanitize.isString(req.body.batch)
+        const status = sanitize.isBoolean(req.body.status)
+      
+        let db = await client.db(process.env.dbName)
+        let userId = new mongodb.ObjectId(sanitize.isString(req.params.id))
+        let data = await db.collection('users').findOne({_id: userId})
+        if(data)
+        {
+            await db.collection('users').updateOne({_id: userId},{$set:{firstName,lastName,email,batch,status}})
+            res.status(200).send({
+                message:"User Data Edited Successfully"
+            })
+        }
+        else
+            res.status(400).send({message:"Invalid User ID"})
+        
+    } catch (error) { 
+        res.status(500).send({
+            message:"Internal Server Error",
+            errorMessage: error.message
+        })
+    }
+    finally{
+        await client.close()
+    }
+}
+const deleteUserById =  async(req,res)=>{
+  await client.connect()
   try {
-      let userId = Number(req.params.id)
-      if(userId<data.length)
+      let db = await client.db(process.env.dbName)
+      let userId = new mongodb.ObjectId(sanitize.isString(req.params.id))
+      let data = await db.collection('users').deleteOne({_id: userId})
+      if(data)
       {
-          data.splice(userId,1,req.body)
           res.status(200).send({
-              message:"User Data Edited Successfully"
+             
+              message:"User Data deleted Successfully"
           })
       }
       else
-      {
-          res.status(400).send({
-              message:"Invalid User ID"
-          })
-      }
-      
+          res.status(400).send({message:"Invalid User ID"})
   } catch (error) { 
       res.status(500).send({
           message:"Internal Server Error",
           errorMessage: error.message
       })
+  }
+  finally{
+      await client.close()
   }
 }
 
-const deleteUserById = async(req,res)=>{
-  try {
-      let userId = Number(req.params.id)
-      if(userId<data.length)
-      {
-          data.splice(userId,1)
-          res.status(200).send({
-              message:"User Data Deleted Successfully"
-          })
-      }
-      else
-      {
-          res.status(400).send({
-              message:"Invalid User ID"
-          })
-      }
-      
-  } catch (error) { 
-      res.status(500).send({
-          message:"Internal Server Error",
-          errorMessage: error.message
-      })
-  }
-}
 
 module.exports={
-  getUsers,
-  getUserById,
-  createUser,
-  editUserById,
-  deleteUserById
+    getUsers,
+    getUserById,
+    createUser,
+    editUserById,
+    deleteUserById
 }
